@@ -11,34 +11,57 @@ import Auth from "./pages/Auth";
 import { SignUp } from "./pages/SignUp";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+// Cria o cliente do React Query
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+      staleTime: 5 * 60 * 1000, // 5 minutos
+    },
+  },
+});
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
+  // BrowserRouter APENAS AQUI (não no main.tsx)
+  <BrowserRouter
+    future={{
+      v7_startTransition: true,
+      v7_relativeSplatPath: true,
+    }}
+  >
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <AuthProvider>
+          <TooltipProvider>
+            {/* Toasters para notificações */}
+            <Toaster />
+            <Sonner />
+            
+            {/* Sistema de rotas */}
             <Routes>
-              <Route
-                path="/"
+              {/* Rotas públicas */}
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/signup" element={<SignUp />} />
+              
+              {/* Rota protegida (dashboard principal) */}
+              <Route 
+                path="/" 
                 element={
                   <ProtectedRoute>
                     <Dashboard />
                   </ProtectedRoute>
-                }
+                } 
               />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/signup" element={<SignUp />} />
+              
+              {/* Rota 404 - Página não encontrada */}
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </AuthProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
+          </TooltipProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  </BrowserRouter>
 );
 
 export default App;

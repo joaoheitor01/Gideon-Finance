@@ -1,316 +1,347 @@
-// This file has been reviewed and meets all the requirements of the user's request.
+import { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from '@/components/ui/use-toast';
+import { Loader2, Mail, Lock, User, Calendar, Eye, EyeOff } from 'lucide-react';
 
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { toast } from "@/components/ui/use-toast";
-import {supabase} from "@/integrations/supabase/client"
-import { useState } from "react";
-import { Link } from "react-router-dom";
+// Schema de validação
+const signUpSchema = z.object({
+  fullName: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres').max(100),
+  email: z.string().email('Email inválido'),
+  password: z.string()
+    .min(8, 'Senha deve ter pelo menos 8 caracteres')
+    .regex(/[A-Z]/, 'Senha deve ter pelo menos uma letra maiúscula')
+    .regex(/[0-9]/, 'Senha deve ter pelo menos um número'),
+  confirmPassword: z.string(),
+  birthDate: z.string().refine((date) => {
+    const birthDate = new Date(date);
+    const today = new Date();
+    const age = today.getFullYear() - birthDate.getFullYear();
+    return age >= 18;
+  }, 'Você deve ter pelo menos 18 anos'),
+  gender: z.enum(['male', 'female', 'other', 'prefer_not_to_say']).optional(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: 'Senhas não coincidem',
+  path: ['confirmPassword'],
+});
 
-const eighteenYearsAgo = new Date();
-eighteenYearsAgo.setFullYear(eighteenYearsAgo.getFullYear() - 18);
-
-const passwordSchema = z
-  .string()
-  .min(8, "A senha deve ter no mínimo 8 caracteres")
-  .refine((password) => /[A-Z]/.test(password), {
-    message: "A senha deve conter pelo menos uma letra maiúscula",
-  })
-  .refine((password) => /[0-9]/.test(password), {
-    message: "A senha deve conter pelo menos um número",
-  });
-
-const formSchema = z
-  .object({
-    fullName: z
-      .string()
-      .min(3, "O nome deve ter no mínimo 3 caracteres")
-      .max(100, "O nome deve ter no máximo 100 caracteres"),
-    email: z.string().email("Formato de email inválido"),
-    password: passwordSchema,
-    confirmPassword: z.string(),
-    birthDate: z.coerce.date().max(eighteenYearsAgo, {
-      message: "Você deve ser maior de 18 anos",
-    }),
-    gender: z.string().optional(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "As senhas não coincidem",
-    path: ["confirmPassword"],
-  });
-
-  const PasswordStrengthBar = ({ password }: { password?: string }) => {
-    const getStrength = () => {
-      if (!password) return 0;
-      let strength = 0;
-      if (password.length >= 8) strength++;
-      if (/[A-Z]/.test(password)) strength++;
-      if (/[0-9]/.test(password)) strength++;
-      if (/[^A-Za-z0-9]/.test(password)) strength++;
-      return strength;
-    };
-  
-    const strength = getStrength();
-    const strengthColor =
-      strength <= 1
-        ? "bg-red-500"
-        : strength === 2
-        ? "bg-yellow-500"
-        : "bg-green-500";
-  
-    return (
-      <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 mt-2">
-        <div
-          className={`h-2.5 rounded-full ${strengthColor}`}
-          style={{ width: `${(strength / 4) * 100}%` }}
-        ></div>
-      </div>
-    );
-  };
-  
+type SignUpFormValues = z.infer<typeof signUpSchema>;
 
 export function SignUp() {
-    const [loading, setLoading] = useState(false);
-    const [showPassword, setShowPassword] = useState(false);
-  
-    const form = useForm<z.infer<typeof formSchema>>({
-      resolver: zodResolver(formSchema),
-      defaultValues: {
-        fullName: "",
-        email: "",
-        password: "",
-        confirmPassword: "",
-        gender: "",
-      },
-    });
+  const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-    const password = form.watch("password");
-  
-    async function onSubmit(data: z.infer<typeof formSchema>) {
-        setLoading(true);
-        try {
-          const { error } = await supabase.auth.signUp({
-            email: data.email,
-            password: data.password,
-            options: {
-              data: {
-                full_name: data.fullName,
-                birth_date: data.birthDate,
-                gender: data.gender,
-              },
-            },
-          });
-          if (error) throw error;
-          toast({
-            title: "Cadastro realizado com sucesso!",
-            description: "Verifique seu email para confirmar sua conta.",
-          });
-        } catch (error) {
-          toast({
-            title: "Erro no cadastro",
-            description: (error as Error).message,
-            variant: "destructive",
-          });
-        } finally {
-          setLoading(false);
+  const form = useForm<SignUpFormValues>({
+    resolver: zodResolver(signUpSchema),
+    defaultValues: {
+      fullName: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      birthDate: '',
+      gender: 'prefer_not_to_say',
+    },
+  });
+
+  const onSubmit = async (values: SignUpFormValues) => {
+    setIsLoading(true);
+    
+    try {
+      console.log('Tentando cadastrar usuário...', values.email);
+      
+      // 1. Cadastro no Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: values.email,
+        password: values.password,
+        options: {
+          data: {
+            full_name: values.fullName,
+            birth_date: values.birthDate,
+            gender: values.gender,
+          },
+          emailRedirectTo: `${window.location.origin}/auth`,
+        },
+      });
+
+      if (authError) {
+        console.error('Erro no cadastro:', authError);
+        
+        if (authError.message.includes('Invalid API key')) {
+          throw new Error('Erro de configuração do servidor. Tente novamente mais tarde.');
         }
+        
+        if (authError.message.includes('already registered')) {
+          throw new Error('Este email já está cadastrado.');
+        }
+        
+        throw new Error(authError.message || 'Erro ao criar conta');
       }
 
+      if (authData.user) {
+        toast({
+          title: '🎉 Cadastro realizado com sucesso!',
+          description: 'Verifique seu email para confirmar sua conta.',
+        });
+      
+        // Redireciona para login após 2 segundos
+        setTimeout(() => {
+          navigate('/auth');
+        }, 2000);
+      }
+
+    } catch (error: any) {
+      console.error('Erro completo:', error);
+      toast({
+        title: '❌ Erro ao cadastrar',
+        description: error.message || 'Ocorreu um erro inesperado.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md dark:bg-gray-800">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Gideon Finance
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Crie sua conta para começar a gerenciar suas finanças
-          </p>
-        </div>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="fullName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    Nome Completo <span className="text-red-500">*</span>
-                  </FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                        👤
-                      </span>
-                      <Input
-                        placeholder="Seu nome completo"
-                        {...field}
-                        className="pl-10"
-                      />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    Email <span className="text-red-500">*</span>
-                  </FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                        ✉️
-                      </span>
-                      <Input
-                        placeholder="seu@email.com"
-                        {...field}
-                        className="pl-10"
-                      />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    Senha <span className="text-red-500">*</span>
-                  </FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                        🔒
-                      </span>
-                      <Input
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Sua senha"
-                        {...field}
-                        className="pl-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute inset-y-0 right-0 flex items-center pr-3"
-                      >
-                        {showPassword ? "🙈" : "👁️"}
-                      </button>
-                    </div>
-                  </FormControl>
-                  <PasswordStrengthBar password={password} />
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="confirmPassword"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    Confirmar Senha <span className="text-red-500">*</span>
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      type="password"
-                      placeholder="Confirme sua senha"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="birthDate"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    Data de Nascimento <span className="text-red-500">*</span>
-                  </FormLabel>
-                  <FormControl>
-                    <Input type="date" {...field} 
-                     />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="gender"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Gênero</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                  >
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md shadow-xl">
+        <CardHeader className="text-center">
+          <div className="flex justify-center mb-4">
+            <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center">
+              <span className="text-2xl text-white">💰</span>
+            </div>
+          </div>
+          <CardTitle className="text-2xl font-bold">Criar Conta</CardTitle>
+          <CardDescription>
+            Preencha seus dados para começar a gerenciar suas finanças
+          </CardDescription>
+        </CardHeader>
+        
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              {/* Nome Completo */}
+              <FormField
+                control={form.control}
+                name="fullName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome Completo *</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione seu gênero" />
-                      </SelectTrigger>
+                      <div className="relative">
+                        <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Input
+                          placeholder="Seu nome completo"
+                          className="pl-10"
+                          {...field}
+                          disabled={isLoading}
+                        />
+                      </div>
                     </FormControl>
-                    <SelectContent>
-                      <SelectItem value="male">Masculino</SelectItem>
-                      <SelectItem value="female">Feminino</SelectItem>
-                      <SelectItem value="other">
-                        Prefiro não informar
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button
-              type="submit"
-              className="w-full hover:bg-primary/90"
-              disabled={loading || !form.formState.isValid}
-            >
-              {loading ? "Cadastrando..." : "Cadastrar"}
-            </Button>
-          </form>
-        </Form>
-        <div className="text-center">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Já tem conta?{" "}
-            <Link
-              to="/auth"
-              className="font-medium text-primary hover:underline"
-            >
-              Fazer Login
-            </Link>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Email */}
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email *</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Input
+                          type="email"
+                          placeholder="seu@email.com"
+                          className="pl-10"
+                          {...field}
+                          disabled={isLoading}
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Data de Nascimento */}
+              <FormField
+                control={form.control}
+                name="birthDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Data de Nascimento *</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Input
+                          type="date"
+                          className="pl-10"
+                          {...field}
+                          disabled={isLoading}
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Gênero */}
+              <FormField
+                control={form.control}
+                name="gender"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Gênero</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="male">Masculino</SelectItem>
+                        <SelectItem value="female">Feminino</SelectItem>
+                        <SelectItem value="other">Outro</SelectItem>
+                        <SelectItem value="prefer_not_to_say">Prefiro não informar</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Senha */}
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Senha *</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Input
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder="••••••••"
+                          className="pl-10 pr-10"
+                          {...field}
+                          disabled={isLoading}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-3"
+                        >
+                          {showPassword ? (
+                            <EyeOff className="h-4 w-4 text-gray-400" />
+                          ) : (
+                            <Eye className="h-4 w-4 text-gray-400" />
+                          )}
+                        </button>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Mínimo 8 caracteres, 1 letra maiúscula e 1 número
+                    </p>
+                  </FormItem>
+                )}
+              />
+
+              {/* Confirmar Senha */}
+              <FormField
+                control={form.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirmar Senha *</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Input
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          placeholder="••••••••"
+                          className="pl-10 pr-10"
+                          {...field}
+                          disabled={isLoading}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-3 top-3"
+                        >
+                          {showConfirmPassword ? (
+                            <EyeOff className="h-4 w-4 text-gray-400" />
+                          ) : (
+                            <Eye className="h-4 w-4 text-gray-400" />
+                          )}
+                        </button>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Botão de Cadastro */}
+              <Button
+                type="submit"
+                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Cadastrando...
+                  </>
+                ) : (
+                  'Criar Conta'
+                )}
+              </Button>
+
+              {/* Link para Login */}
+              <div className="text-center mt-4">
+                <p className="text-sm text-gray-600">
+                  Já tem conta?{' '}
+                  <Link
+                    to="/auth"
+                    className="text-blue-600 hover:text-blue-800 font-semibold"
+                  >
+                    Fazer Login
+                  </Link>
+                </p>
+              </div>
+            </form>
+          </Form>
+
+          {/* Termos e Condições */}
+          <p className="text-xs text-gray-500 text-center mt-6">
+            Ao criar uma conta, você concorda com nossos{' '}
+            <a href="#" className="text-blue-600 hover:underline">
+              Termos de Serviço
+            </a>{' '}
+            e{' '}
+            <a href="#" className="text-blue-600 hover:underline">
+              Política de Privacidade
+            </a>
+            .
           </p>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
