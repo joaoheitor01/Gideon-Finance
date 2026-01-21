@@ -14,17 +14,13 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // Validação e debug
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('❌ ERRO: Variáveis de ambiente do Supabase não configuradas!');
-  console.error('Verifique se o arquivo .env existe e contém:');
-  console.error('VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY');
+  throw new Error("❌ ERRO: Variáveis de ambiente do Supabase (VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY) não configuradas! Verifique se o arquivo .env existe.");
 }
-
-console.log('🔧 Supabase configurado com URL:', supabaseUrl?.substring(0, 50) + '...');
 
 // Cria o cliente Supabase com configurações otimizadas
 export const supabase = createClient<Database>(
-  supabaseUrl || '', 
-  supabaseAnonKey || '', 
+  supabaseUrl, 
+  supabaseAnonKey, 
   {
     auth: {
       autoRefreshToken: true,

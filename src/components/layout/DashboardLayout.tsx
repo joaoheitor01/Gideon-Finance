@@ -22,7 +22,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           
           <div className="flex items-center gap-4">
             <span className="hidden text-sm text-muted-foreground sm:block">
-              {user?.email}
+              {user?.user_metadata?.full_name || user?.email}
             </span>
             
             <Button

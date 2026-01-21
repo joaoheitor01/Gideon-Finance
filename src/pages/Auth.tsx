@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
+import { supabase } from "@/integrations/supabase/client";
 
 const emailSchema = z.string().email("Email inválido");
 const passwordSchema = z.string().min(6, "A senha deve ter pelo menos 6 caracteres");
@@ -49,15 +50,73 @@ export default function Auth() {
       }
     }
 
-    const { error } = await signIn(formData.email, formData.password);
-    if (error) {
+    // Check for locked account
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("account_locked, failed_login_attempts, user_id")
+      .eq("email", formData.email)
+      .single();
+
+    if (profile?.account_locked) {
       toast({
-        title: "Erro ao entrar",
-        description: error.message === "Invalid login credentials"
-          ? "Email ou senha incorretos"
-          : error.message,
+        title: "Conta bloqueada",
+        description: "Sua conta foi bloqueada por excesso de tentativas. Por favor, recupere sua senha.",
         variant: "destructive",
       });
+      setIsSubmitting(false);
+      return;
+    }
+
+    const { error } = await signIn(formData.email, formData.password);
+    if (error) {
+      if (error.message === "Invalid login credentials") {
+        if (profile) {
+          const newAttempts = (profile.failed_login_attempts || 0) + 1;
+          let locked = profile.account_locked;
+          if (newAttempts >= 5) {
+            locked = true;
+          }
+
+          await supabase
+            .from("profiles")
+            .update({ failed_login_attempts: newAttempts, account_locked: locked })
+            .eq("email", formData.email);
+
+          if (locked) {
+            toast({
+              title: "Conta bloqueada",
+              description: "Sua conta foi bloqueada por excesso de tentativas. Por favor, recupere sua senha.",
+              variant: "destructive",
+            });
+          } else {
+             toast({
+              title: "Erro ao entrar",
+              description: `Email ou senha incorretos. Você tem mais ${5 - newAttempts} tentativas.`,
+              variant: "destructive",
+            });
+          }
+        } else {
+           toast({
+            title: "Erro ao entrar",
+            description: "Email ou senha incorretos",
+            variant: "destructive",
+          });
+        }
+      } else {
+        toast({
+          title: "Erro ao entrar",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
+    } else {
+      // Reset attempts on successful login
+      if (profile) {
+        await supabase
+          .from("profiles")
+          .update({ failed_login_attempts: 0 })
+          .eq("email", formData.email);
+      }
     }
 
     setIsSubmitting(false);
@@ -130,9 +189,19 @@ export default function Auth() {
                 Criar Conta
               </Link>
             </p>
+            <p className="text-muted-foreground mt-2">
+              Esqueceu sua senha?{" "}
+              <Link
+                to="/forgot-password"
+                className="text-primary hover:underline font-medium"
+              >
+                Recuperar Senha
+              </Link>
+            </p>
           </div>
         </div>
       </div>
     </div>
   );
 }
+

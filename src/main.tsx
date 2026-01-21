@@ -4,17 +4,11 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App.tsx';
 import './index.css';
 
-const root = ReactDOM.createRoot(
-  document.getElementById('root') as HTMLElement
-);
+const root = ReactDOM.createRoot(document.getElementById('root')!);
 
+// ✅ APENAS ISSO:
 root.render(
   <React.StrictMode>
-    <BrowserRouter future={{
-      v7_startTransition: true,
-      v7_relativeSplatPath: true,
-    }}>
-      <App />
-    </BrowserRouter>
+    <App /> {/* ← NÃO envolva com <BrowserRouter> aqui! */}
   </React.StrictMode>
 );
