@@ -61,7 +61,7 @@ export function useTransactions() {
 
   const addTransaction = async (input: TransactionInput) => {
     if (!user) return { error: new Error("Usuário não autenticado") };
-
+    
     const { data, error } = await supabase
       .from("transactions")
       .insert({

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { toast } from '@/components/ui/use-toast';
 import { Loader2, Mail, Lock, User, Calendar, Eye, EyeOff } from 'lucide-react';
 
@@ -28,6 +29,9 @@ const signUpSchema = z.object({
     return age >= 18;
   }, 'Você deve ter pelo menos 18 anos'),
   gender: z.enum(['male', 'female', 'other', 'prefer_not_to_say']).optional(),
+  accountType: z.enum(['Pessoal', 'Empresarial'], {
+    required_error: 'Selecione o tipo de conta',
+  }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Senhas não coincidem',
   path: ['confirmPassword'],
@@ -50,6 +54,7 @@ export function SignUp() {
       confirmPassword: '',
       birthDate: '',
       gender: 'prefer_not_to_say',
+      accountType: 'Pessoal',
     },
   });
 
@@ -68,6 +73,7 @@ export function SignUp() {
             full_name: values.fullName,
             birth_date: values.birthDate,
             gender: values.gender,
+            account_type: values.accountType,
           },
           emailRedirectTo: `${window.location.origin}/auth`,
         },
@@ -111,237 +117,540 @@ export function SignUp() {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md shadow-xl">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center">
-              <span className="text-2xl text-white">💰</span>
-            </div>
-          </div>
-          <CardTitle className="text-2xl font-bold">Criar Conta</CardTitle>
-          <CardDescription>
-            Preencha seus dados para começar a gerenciar suas finanças
-          </CardDescription>
-        </CardHeader>
-        
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              {/* Nome Completo */}
-              <FormField
-                control={form.control}
-                name="fullName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nome Completo *</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <Input
-                          placeholder="Seu nome completo"
-                          className="pl-10"
-                          {...field}
-                          disabled={isLoading}
-                        />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+  
 
-              {/* Email */}
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email *</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <Input
-                          type="email"
-                          placeholder="seu@email.com"
-                          className="pl-10"
-                          {...field}
-                          disabled={isLoading}
-                        />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+    return (
 
-              {/* Data de Nascimento */}
-              <FormField
-                control={form.control}
-                name="birthDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Data de Nascimento *</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Calendar className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <Input
-                          type="date"
-                          className="pl-10"
-                          {...field}
-                          disabled={isLoading}
-                        />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
 
-              {/* Gênero */}
-              <FormField
-                control={form.control}
-                name="gender"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Gênero</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="male">Masculino</SelectItem>
-                        <SelectItem value="female">Feminino</SelectItem>
-                        <SelectItem value="other">Outro</SelectItem>
-                        <SelectItem value="prefer_not_to_say">Prefiro não informar</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+        <Card className="w-full max-w-md shadow-xl">
 
-              {/* Senha */}
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Senha *</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <Input
-                          type={showPassword ? 'text' : 'password'}
-                          placeholder="••••••••"
-                          className="pl-10 pr-10"
-                          {...field}
-                          disabled={isLoading}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-3"
-                        >
-                          {showPassword ? (
-                            <EyeOff className="h-4 w-4 text-gray-400" />
-                          ) : (
-                            <Eye className="h-4 w-4 text-gray-400" />
-                          )}
-                        </button>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Mínimo 8 caracteres, 1 letra maiúscula e 1 número
-                    </p>
-                  </FormItem>
-                )}
-              />
+          <CardHeader className="text-center">
 
-              {/* Confirmar Senha */}
-              <FormField
-                control={form.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Confirmar Senha *</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <Input
-                          type={showConfirmPassword ? 'text' : 'password'}
-                          placeholder="••••••••"
-                          className="pl-10 pr-10"
-                          {...field}
-                          disabled={isLoading}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-3 top-3"
-                        >
-                          {showConfirmPassword ? (
-                            <EyeOff className="h-4 w-4 text-gray-400" />
-                          ) : (
-                            <Eye className="h-4 w-4 text-gray-400" />
-                          )}
-                        </button>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <div className="flex justify-center mb-4">
 
-              {/* Botão de Cadastro */}
-              <Button
-                type="submit"
-                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Cadastrando...
-                  </>
-                ) : (
-                  'Criar Conta'
-                )}
-              </Button>
+              <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
 
-              {/* Link para Login */}
-              <div className="text-center mt-4">
-                <p className="text-sm text-gray-600">
-                  Já tem conta?{' '}
-                  <Link
-                    to="/auth"
-                    className="text-blue-600 hover:text-blue-800 font-semibold"
-                  >
-                    Fazer Login
-                  </Link>
-                </p>
+                <span className="text-2xl text-primary-foreground">💰</span>
+
               </div>
-            </form>
-          </Form>
 
-          {/* Termos e Condições */}
-          <p className="text-xs text-gray-500 text-center mt-6">
-            Ao criar uma conta, você concorda com nossos{' '}
-            <a href="#" className="text-blue-600 hover:underline">
-              Termos de Serviço
-            </a>{' '}
-            e{' '}
-            <a href="#" className="text-blue-600 hover:underline">
-              Política de Privacidade
-            </a>
-            .
-          </p>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
+            </div>
+
+            <CardTitle className="text-2xl font-bold">Criar Conta</CardTitle>
+
+            <CardDescription>
+
+              Preencha seus dados para começar a gerenciar suas finanças
+
+            </CardDescription>
+
+          </CardHeader>
+
+          
+
+          <CardContent>
+
+            <Form {...form}>
+
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+
+                {/* Nome Completo */}
+
+                <FormField
+
+                  control={form.control}
+
+                  name="fullName"
+
+                  render={({ field }) => (
+
+                    <FormItem>
+
+                      <FormLabel>Nome Completo *</FormLabel>
+
+                      <FormControl>
+
+                        <div className="relative">
+
+                          <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+
+                          <Input
+
+                            placeholder="Seu nome completo"
+
+                            className="pl-10"
+
+                            {...field}
+
+                            disabled={isLoading}
+
+                          />
+
+                        </div>
+
+                      </FormControl>
+
+                      <FormMessage />
+
+                    </FormItem>
+
+                  )}
+
+                />
+
+  
+
+                {/* Email */}
+
+                <FormField
+
+                  control={form.control}
+
+                  name="email"
+
+                  render={({ field }) => (
+
+                    <FormItem>
+
+                      <FormLabel>Email *</FormLabel>
+
+                      <FormControl>
+
+                        <div className="relative">
+
+                          <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+
+                          <Input
+
+                            type="email"
+
+                            placeholder="seu@email.com"
+
+                            className="pl-10"
+
+                            {...field}
+
+                            disabled={isLoading}
+
+                          />
+
+                        </div>
+
+                      </FormControl>
+
+                      <FormMessage />
+
+                    </FormItem>
+
+                  )}
+
+                />
+
+  
+
+                {/* Tipo de Conta */}
+
+                <FormField
+
+                  control={form.control}
+
+                  name="accountType"
+
+                  render={({ field }) => (
+
+                    <FormItem className="space-y-3">
+
+                      <FormLabel>Tipo de Uso *</FormLabel>
+
+                      <FormControl>
+
+                        <RadioGroup
+
+                          onValueChange={field.onChange}
+
+                          defaultValue={field.value}
+
+                          className="flex space-x-4"
+
+                          disabled={isLoading}
+
+                        >
+
+                          <FormItem className="flex items-center space-x-2">
+
+                            <FormControl>
+
+                              <RadioGroupItem value="Pessoal" id="r1" />
+
+                            </FormControl>
+
+                            <FormLabel htmlFor="r1" className="font-normal">Pessoal</FormLabel>
+
+                          </FormItem>
+
+                          <FormItem className="flex items-center space-x-2">
+
+                            <FormControl>
+
+                              <RadioGroupItem value="Empresarial" id="r2" />
+
+                            </FormControl>
+
+                            <FormLabel htmlFor="r2" className="font-normal">Empresarial</FormLabel>
+
+                          </FormItem>
+
+                        </RadioGroup>
+
+                      </FormControl>
+
+                      <FormMessage />
+
+                    </FormItem>
+
+                  )}
+
+                />
+
+  
+
+                {/* Data de Nascimento */}
+
+                <FormField
+
+                  control={form.control}
+
+                  name="birthDate"
+
+                  render={({ field }) => (
+
+                    <FormItem>
+
+                      <FormLabel>Data de Nascimento *</FormLabel>
+
+                      <FormControl>
+
+                        <div className="relative">
+
+                          <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+
+                          <Input
+
+                            type="date"
+
+                            className="pl-10"
+
+                            {...field}
+
+                            disabled={isLoading}
+
+                          />
+
+                        </div>
+
+                      </FormControl>
+
+                      <FormMessage />
+
+                    </FormItem>
+
+                  )}
+
+                />
+
+  
+
+                {/* Gênero */}
+
+                <FormField
+
+                  control={form.control}
+
+                  name="gender"
+
+                  render={({ field }) => (
+
+                    <FormItem>
+
+                      <FormLabel>Gênero</FormLabel>
+
+                      <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading}>
+
+                        <FormControl>
+
+                          <SelectTrigger>
+
+                            <SelectValue placeholder="Selecione" />
+
+                          </SelectTrigger>
+
+                        </FormControl>
+
+                        <SelectContent>
+
+                          <SelectItem value="male">Masculino</SelectItem>
+
+                          <SelectItem value="female">Feminino</SelectItem>
+
+                          <SelectItem value="other">Outro</SelectItem>
+
+                          <SelectItem value="prefer_not_to_say">Prefiro não informar</SelectItem>
+
+                        </SelectContent>
+
+                      </Select>
+
+                      <FormMessage />
+
+                    </FormItem>
+
+                  )}
+
+                />
+
+  
+
+                {/* Senha */}
+
+                <FormField
+
+                  control={form.control}
+
+                  name="password"
+
+                  render={({ field }) => (
+
+                    <FormItem>
+
+                      <FormLabel>Senha *</FormLabel>
+
+                      <FormControl>
+
+                        <div className="relative">
+
+                          <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+
+                          <Input
+
+                            type={showPassword ? 'text' : 'password'}
+
+                            placeholder="••••••••"
+
+                            className="pl-10 pr-10"
+
+                            {...field}
+
+                            disabled={isLoading}
+
+                          />
+
+                          <button
+
+                            type="button"
+
+                            onClick={() => setShowPassword(!showPassword)}
+
+                            className="absolute right-3 top-3"
+
+                          >
+
+                            {showPassword ? (
+
+                              <EyeOff className="h-4 w-4 text-muted-foreground" />
+
+                            ) : (
+
+                              <Eye className="h-4 w-4 text-muted-foreground" />
+
+                            )}
+
+                          </button>
+
+                        </div>
+
+                      </FormControl>
+
+                      <FormMessage />
+
+                      <p className="text-xs text-muted-foreground mt-1">
+
+                        Mínimo 8 caracteres, 1 letra maiúscula e 1 número
+
+                      </p>
+
+                    </FormItem>
+
+                  )}
+
+                />
+
+  
+
+                {/* Confirmar Senha */}
+
+                <FormField
+
+                  control={form.control}
+
+                  name="confirmPassword"
+
+                  render={({ field }) => (
+
+                    <FormItem>
+
+                      <FormLabel>Confirmar Senha *</FormLabel>
+
+                      <FormControl>
+
+                        <div className="relative">
+
+                          <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+
+                          <Input
+
+                            type={showConfirmPassword ? 'text' : 'password'}
+
+                            placeholder="••••••••"
+
+                            className="pl-10 pr-10"
+
+                            {...field}
+
+                            disabled={isLoading}
+
+                          />
+
+                          <button
+
+                            type="button"
+
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+
+                            className="absolute right-3 top-3"
+
+                          >
+
+                            {showConfirmPassword ? (
+
+                              <EyeOff className="h-4 w-4 text-muted-foreground" />
+
+                            ) : (
+
+                              <Eye className="h-4 w-4 text-muted-foreground" />
+
+                            )}
+
+                          </button>
+
+                        </div>
+
+                      </FormControl>
+
+                      <FormMessage />
+
+                    </FormItem>
+
+                  )}
+
+                />
+
+  
+
+                {/* Botão de Cadastro */}
+
+                <Button
+
+                  type="submit"
+
+                  className="w-full"
+
+                  disabled={isLoading}
+
+                >
+
+                  {isLoading ? (
+
+                    <>
+
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+
+                      Cadastrando...
+
+                    </>
+
+                  ) : (
+
+                    'Criar Conta'
+
+                  )}
+
+                </Button>
+
+  
+
+                {/* Link para Login */}
+
+                <div className="text-center mt-4">
+
+                  <p className="text-sm text-muted-foreground">
+
+                    Já tem conta?{' '}
+
+                    <Link
+
+                      to="/auth"
+
+                      className="text-primary hover:text-primary/90 font-semibold"
+
+                    >
+
+                      Fazer Login
+
+                    </Link>
+
+                  </p>
+
+                </div>
+
+              </form>
+
+            </Form>
+
+  
+
+            {/* Termos e Condições */}
+
+            <p className="text-xs text-muted-foreground text-center mt-6">
+
+              Ao criar uma conta, você concorda com nossos{' '}
+
+              <a href="#" className="text-primary hover:underline">
+
+                Termos de Serviço
+
+              </a>{' '}
+
+              e{' '}
+
+              <a href="#" className="text-primary hover:underline">
+
+                Política de Privacidade
+
+              </a>
+
+              .
+
+            </p>
+
+          </CardContent>
+
+        </Card>
+
+      </div>
+
+    );
+
+  }
+
+  
