@@ -27,7 +27,7 @@ describe("SignUp", () => {
       </BrowserRouter>
     );
 
-    expect(screen.getByText("Criar Conta")).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: "Criar Conta" })).toBeInTheDocument();
     expect(screen.getByText("Preencha seus dados para começar a gerenciar suas finanças")).toBeInTheDocument();
     expect(screen.getByLabelText("Nome Completo *")).toBeInTheDocument();
     expect(screen.getByLabelText("Email *")).toBeInTheDocument();

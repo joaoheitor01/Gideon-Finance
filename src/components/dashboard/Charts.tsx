@@ -12,7 +12,6 @@ import {
   PieChart,
   Pie,
   Cell,
-  Legend,
 } from "recharts";
 
 interface ChartsProps {
@@ -76,6 +75,40 @@ export function Charts({ transactions, selectedYear }: ChartsProps) {
       .sort((a, b) => b.value - a.value);
   }, [transactions, selectedYear]);
 
+  // Componente personalizado para os labels brancos
+  const renderCustomizedLabel = ({
+    cx,
+    cy,
+    midAngle,
+    innerRadius,
+    outerRadius,
+    percent,
+    name,
+  }: any) => {
+    const RADIAN = Math.PI / 180;
+    const radius = innerRadius + (outerRadius - innerRadius) * 1.3;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+    return (
+      <text
+        x={x}
+        y={y}
+        fill="white"
+        textAnchor={x > cx ? "start" : "end"}
+        dominantBaseline="central"
+        fontSize={12}
+        fontWeight="bold"
+        style={{
+          textShadow: "1px 1px 3px rgba(0, 0, 0, 0.8)",
+          filter: "drop-shadow(1px 1px 2px rgba(0,0,0,0.8))",
+        }}
+      >
+        {`${name} (${(percent * 100).toFixed(0)}%)`}
+      </text>
+    );
+  };
+
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <div className="rounded-lg border border-border bg-card p-6 animate-fade-in">
@@ -136,17 +169,20 @@ export function Charts({ transactions, selectedYear }: ChartsProps) {
                   cx="50%"
                   cy="50%"
                   outerRadius={100}
+                  innerRadius={60}
                   fill="#8884d8"
                   dataKey="value"
-                  label={({ name, percent }) =>
-                    `${name} (${(percent * 100).toFixed(0)}%)`
-                  }
+                  label={renderCustomizedLabel}
                   labelLine={false}
+                  isAnimationActive={true}
+                  animationDuration={800}
                 >
                   {pieData.map((_, index) => (
                     <Cell
                       key={`cell-${index}`}
                       fill={COLORS[index % COLORS.length]}
+                      stroke="hsl(var(--border))"
+                      strokeWidth={1}
                     />
                   ))}
                 </Pie>
@@ -155,13 +191,19 @@ export function Charts({ transactions, selectedYear }: ChartsProps) {
                     backgroundColor: "hsl(var(--card))",
                     border: "1px solid hsl(var(--border))",
                     borderRadius: "8px",
+                    color: "hsl(var(--foreground))",
+                    fontSize: "14px",
                   }}
-                  formatter={(value: number) =>
+                  itemStyle={{
+                    color: "hsl(var(--foreground))",
+                  }}
+                  formatter={(value: number) => [
                     new Intl.NumberFormat("pt-BR", {
                       style: "currency",
                       currency: "BRL",
-                    }).format(value)
-                  }
+                    }).format(value),
+                    "Valor",
+                  ]}
                 />
               </PieChart>
             </ResponsiveContainer>

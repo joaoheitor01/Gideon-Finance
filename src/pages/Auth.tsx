@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 const emailSchema = z.string().email("Email inválido");
 const passwordSchema = z.string().min(6, "A senha deve ter pelo menos 6 caracteres");
@@ -14,6 +15,7 @@ const passwordSchema = z.string().min(6, "A senha deve ter pelo menos 6 caracter
 export default function Auth() {
   const { user, loading, signIn } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -153,21 +155,33 @@ export default function Auth() {
               />
             </div>
 
-            <div>
+            <div className="relative">
               <Label htmlFor="password" className="text-foreground">
                 Senha
               </Label>
               <Input
                 id="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 value={formData.password}
                 onChange={(e) =>
                   setFormData((prev) => ({ ...prev, password: e.target.value }))
                 }
-                className="mt-1.5 bg-secondary border-0 h-12"
+                className="mt-1.5 bg-secondary border-0 h-12 pr-10"
                 required
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-9 text-muted-foreground"
+                aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-5 w-5" />
+                ) : (
+                  <Eye className="h-5 w-5" />
+                )}
+              </button>
             </div>
 
             <Button
@@ -175,7 +189,14 @@ export default function Auth() {
               disabled={isSubmitting}
               className="w-full h-12 text-base font-semibold"
             >
-              {isSubmitting ? "Carregando..." : "Acessar Conta"}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Aguarde...
+                </>
+              ) : (
+                "Acessar Conta"
+              )}
             </Button>
           </form>
 

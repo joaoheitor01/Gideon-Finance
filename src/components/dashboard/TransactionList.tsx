@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Transaction } from "@/hooks/useTransactions";
 import { formatCurrency, formatDate, MONTHS } from "@/lib/formatters";
-import { Trash2, X } from "lucide-react";
+import { Trash2, X, Inbox, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -72,10 +72,20 @@ export function TransactionList({
       </div>
       
       {filteredTransactions.length === 0 ? (
-        <div className="p-8 text-center">
-          <p className="text-muted-foreground">
-            Nenhuma transação neste mês
+        <div className="flex flex-col items-center justify-center p-8 text-center">
+          <div className="mb-4 rounded-full bg-secondary p-4">
+            <Inbox className="h-10 w-10 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-semibold text-foreground">
+            Nenhuma transação encontrada
+          </h3>
+          <p className="mt-1 text-muted-foreground">
+            Que tal registrar sua primeira transação?
           </p>
+          <Button className="mt-4 gap-2" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+            <Plus className="h-4 w-4" />
+            Adicionar Transação
+          </Button>
         </div>
       ) : (
         <div className="overflow-x-auto">
