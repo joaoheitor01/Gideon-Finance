@@ -42,8 +42,6 @@ type SignUpFormValues = z.infer<typeof signUpSchema>;
 export function SignUp() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const form = useForm<SignUpFormValues>({
     resolver: zodResolver(signUpSchema),
@@ -62,8 +60,6 @@ export function SignUp() {
     setIsLoading(true);
     
     try {
-      console.log('Tentando cadastrar usuário...', values.email);
-      
       // 1. Cadastro no Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: values.email,
@@ -106,7 +102,6 @@ export function SignUp() {
       }
 
     } catch (error: any) {
-      console.error('Erro completo:', error);
       toast({
         title: '❌ Erro ao cadastrar',
         description: error.message || 'Ocorreu um erro inesperado.',
@@ -167,29 +162,21 @@ export function SignUp() {
 
                     <FormItem>
 
-                      <FormLabel>Nome Completo *</FormLabel>
+                                                                  <FormLabel>Nome Completo *</FormLabel>
 
-                      <FormControl>
+                                                                  <FormControl>
 
-                        <div className="relative">
+                                                                    <Input
 
-                          <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                                                      placeholder="Seu nome completo"
 
-                          <Input
+                                                                      {...field}
 
-                            placeholder="Seu nome completo"
+                                                                      disabled={isLoading}
 
-                            className="pl-10"
+                                                                    />
 
-                            {...field}
-
-                            disabled={isLoading}
-
-                          />
-
-                        </div>
-
-                      </FormControl>
+                                                                  </FormControl>
 
                       <FormMessage />
 
@@ -213,31 +200,23 @@ export function SignUp() {
 
                     <FormItem>
 
-                      <FormLabel>Email *</FormLabel>
+                                            <FormLabel>Email *</FormLabel>
 
-                      <FormControl>
+                                            <FormControl>
 
-                        <div className="relative">
+                                              <Input
 
-                          <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                                type="email"
 
-                          <Input
+                                                placeholder="seu@email.com"
 
-                            type="email"
+                                                {...field}
 
-                            placeholder="seu@email.com"
+                                                disabled={isLoading}
 
-                            className="pl-10"
+                                              />
 
-                            {...field}
-
-                            disabled={isLoading}
-
-                          />
-
-                        </div>
-
-                      </FormControl>
+                                            </FormControl>
 
                       <FormMessage />
 
@@ -317,47 +296,39 @@ export function SignUp() {
 
                 {/* Data de Nascimento */}
 
-                <FormField
+                                <FormField
 
-                  control={form.control}
+                                  control={form.control}
 
-                  name="birthDate"
+                                  name="birthDate"
 
-                  render={({ field }) => (
+                                  render={({ field }) => (
 
-                    <FormItem>
+                                    <FormItem>
 
-                      <FormLabel>Data de Nascimento *</FormLabel>
+                                      <FormLabel>Data de Nascimento *</FormLabel>
 
-                      <FormControl>
+                                      <FormControl>
 
-                        <div className="relative">
+                                        <Input
 
-                          <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                          type="date"
 
-                          <Input
+                                          {...field}
 
-                            type="date"
+                                          disabled={isLoading}
 
-                            className="pl-10"
+                                        />
 
-                            {...field}
+                                      </FormControl>
 
-                            disabled={isLoading}
+                                      <FormMessage />
 
-                          />
+                                    </FormItem>
 
-                        </div>
+                                  )}
 
-                      </FormControl>
-
-                      <FormMessage />
-
-                    </FormItem>
-
-                  )}
-
-                />
+                                />
 
   
 
@@ -423,53 +394,23 @@ export function SignUp() {
 
                     <FormItem>
 
-                      <FormLabel>Senha *</FormLabel>
+                                                                  <FormLabel>Senha *</FormLabel>
 
-                      <FormControl>
+                                                                  <FormControl>
 
-                        <div className="relative">
+                                                                    <Input
 
-                          <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                                                      type="password"
 
-                          <Input
+                                                                      placeholder="••••••••"
 
-                            type={showPassword ? 'text' : 'password'}
+                                                                      {...field}
 
-                            placeholder="••••••••"
+                                                                      disabled={isLoading}
 
-                            className="pl-10 pr-10"
+                                                                    />
 
-                            {...field}
-
-                            disabled={isLoading}
-
-                          />
-
-                          <button
-
-                            type="button"
-
-                            onClick={() => setShowPassword(!showPassword)}
-
-                            className="absolute right-3 top-3"
-
-                          >
-
-                            {showPassword ? (
-
-                              <EyeOff className="h-4 w-4 text-muted-foreground" />
-
-                            ) : (
-
-                              <Eye className="h-4 w-4 text-muted-foreground" />
-
-                            )}
-
-                          </button>
-
-                        </div>
-
-                      </FormControl>
+                                                                  </FormControl>
 
                       <FormMessage />
 
@@ -499,53 +440,23 @@ export function SignUp() {
 
                     <FormItem>
 
-                      <FormLabel>Confirmar Senha *</FormLabel>
+                                                                  <FormLabel>Confirmar Senha *</FormLabel>
 
-                      <FormControl>
+                                                                  <FormControl>
 
-                        <div className="relative">
+                                                                    <Input
 
-                          <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                                                      type="password"
 
-                          <Input
+                                                                      placeholder="••••••••"
 
-                            type={showConfirmPassword ? 'text' : 'password'}
+                                                                      {...field}
 
-                            placeholder="••••••••"
+                                                                      disabled={isLoading}
 
-                            className="pl-10 pr-10"
+                                                                    />
 
-                            {...field}
-
-                            disabled={isLoading}
-
-                          />
-
-                          <button
-
-                            type="button"
-
-                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-
-                            className="absolute right-3 top-3"
-
-                          >
-
-                            {showConfirmPassword ? (
-
-                              <EyeOff className="h-4 w-4 text-muted-foreground" />
-
-                            ) : (
-
-                              <Eye className="h-4 w-4 text-muted-foreground" />
-
-                            )}
-
-                          </button>
-
-                        </div>
-
-                      </FormControl>
+                                                                  </FormControl>
 
                       <FormMessage />
 
