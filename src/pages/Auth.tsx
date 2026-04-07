@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 const emailSchema = z.string().email("Email inválido");
-const passwordSchema = z.string().min(6, "A senha deve ter pelo menos 6 caracteres");
+const passwordSchema = z.string().min(8, "A senha deve ter pelo menos 8 caracteres");
 
 export default function Auth() {
   const { user, loading, signIn } = useAuth();
@@ -80,46 +80,34 @@ export default function Auth() {
 
     const { error } = await signIn(formData.email, formData.password);
     if (error) {
-      if (error.message === "Invalid login credentials") {
-        // Find user by email to get their ID
-        const { data: user, error: userError } = await supabase
-          .from("users")
-          .select("id")
+      if (error.message === "Invalid login credentials" || error.message.includes("Invalid login")) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("id, account_locked, failed_login_attempts")
           .eq("email", formData.email)
-          .single();
+          .maybeSingle();
 
-        if (user) {
-          const { data: profile, error: profileError } = await supabase
+        if (profile) {
+          const newAttempts = (profile.failed_login_attempts || 0) + 1;
+          const locked = newAttempts >= 5;
+
+          await supabase
             .from("profiles")
-            .select("account_locked, failed_login_attempts")
-            .eq("user_id", user.id)
-            .single();
-            
-          if (profile) {
-            const newAttempts = (profile.failed_login_attempts || 0) + 1;
-            let locked = profile.account_locked;
-            if (newAttempts >= 5) {
-              locked = true;
-            }
+            .update({ failed_login_attempts: newAttempts, account_locked: locked })
+            .eq("id", profile.id);
 
-            await supabase
-              .from("profiles")
-              .update({ failed_login_attempts: newAttempts, account_locked: locked })
-              .eq("user_id", user.id);
-
-            if (locked) {
-              toast({
-                title: "Conta bloqueada",
-                description: "Sua conta foi bloqueada por excesso de tentativas. Por favor, recupere sua senha.",
-                variant: "destructive",
-              });
-            } else {
-              toast({
-                title: "Erro ao entrar",
-                description: `Email ou senha incorretos. Você tem mais ${5 - newAttempts} tentativas.`,
-                variant: "destructive",
-              });
-            }
+          if (locked) {
+            toast({
+              title: "Conta bloqueada",
+              description: "Sua conta foi bloqueada por excesso de tentativas. Por favor, recupere sua senha.",
+              variant: "destructive",
+            });
+          } else {
+            toast({
+              title: "Erro ao entrar",
+              description: `Email ou senha incorretos. Você tem mais ${5 - newAttempts} tentativas.`,
+              variant: "destructive",
+            });
           }
         } else {
           toast({
@@ -136,14 +124,12 @@ export default function Auth() {
         });
       }
     } else {
-      // On successful login, find the user to reset their attempts
-      const { data: user, error: userError } = await supabase.auth.getUser();
-
-      if (user?.user) {
+      const { data: authData } = await supabase.auth.getUser();
+      if (authData?.user) {
         await supabase
           .from("profiles")
           .update({ failed_login_attempts: 0, account_locked: false })
-          .eq("user_id", user.user.id);
+          .eq("id", authData.user.id);
       }
     }
 

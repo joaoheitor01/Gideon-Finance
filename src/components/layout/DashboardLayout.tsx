@@ -1,8 +1,9 @@
 import { ReactNode } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme } from 'next-themes'
+import { useTheme } from 'next-themes';
+import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Moon, Sun, LogOut } from "lucide-react";
+import { Moon, Sun, LogOut, TrendingUp } from "lucide-react";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -11,6 +12,9 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const { user, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isInvestmentsPage = location.pathname === "/investments";
 
   return (
     <div className="min-h-screen bg-background">
@@ -20,7 +24,25 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             Gideon Finance
           </h1>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+
+            <Button
+              variant={isInvestmentsPage ? "default" : "ghost"}
+              size="sm"
+              onClick={() => navigate("/investments")}
+              className="gap-2"
+            >
+              <TrendingUp className="h-4 w-4" />
+              <span className="hidden sm:inline">Investimentos</span>
+            </Button>
+
+            <Button
+              variant={!isInvestmentsPage ? "default" : "outline"}
+              size="sm"
+              onClick={() => navigate("/")}
+            >
+              <span className="hidden sm:inline">Dashboard</span>
+            </Button>
             <span className="hidden text-sm text-muted-foreground sm:block">
               {user?.user_metadata?.full_name || user?.email}
             </span>

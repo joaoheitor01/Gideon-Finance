@@ -7,7 +7,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 
-const passwordSchema = z.string().min(6, "A senha deve ter pelo menos 6 caracteres");
+const passwordSchema = z.string().min(8, "A senha deve ter pelo menos 8 caracteres");
 
 export default function ResetPassword() {
   const [isSubmitting, setIsSubmitting] = useState(false);

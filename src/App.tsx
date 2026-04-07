@@ -5,6 +5,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Dashboard from "./pages/Dashboard";
+import Investments from "./pages/Investments";
 import Auth from "./pages/Auth";
 import { SignUp } from "./pages/SignUp";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -44,13 +45,21 @@ const App = () => (
               <Route path="/auth/callback" element={<AuthCallback />} />
               
               {/* Rota protegida (dashboard principal) */}
-              <Route 
-                path="/" 
+              <Route
+                path="/"
                 element={
                   <ProtectedRoute>
                     <Dashboard />
                   </ProtectedRoute>
-                } 
+                }
+              />
+              <Route
+                path="/investments"
+                element={
+                  <ProtectedRoute>
+                    <Investments />
+                  </ProtectedRoute>
+                }
               />
               
               {/* Rota 404 - Página não encontrada */}

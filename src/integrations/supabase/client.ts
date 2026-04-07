@@ -27,7 +27,7 @@ export const supabase = createClient<Database>(
       persistSession: true,
       detectSessionInUrl: true,
       storageKey: 'gideon-finance-auth',
-      storage: localStorage,
+      storage: typeof window !== 'undefined' ? window.localStorage : undefined,
       flowType: 'pkce',
     },
     global: {

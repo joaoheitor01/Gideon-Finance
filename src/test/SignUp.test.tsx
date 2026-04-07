@@ -5,14 +5,6 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { vi } from "vitest";
 import { act } from "react-dom/test-utils";
 
-// Mock ResizeObserver
-const ResizeObserverMock = vi.fn(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}));
-vi.stubGlobal("ResizeObserver", ResizeObserverMock);
-
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     auth: {
@@ -28,14 +20,6 @@ vi.mock("@/integrations/supabase/client", () => ({
     })),
   },
 }));
-
-// Mock window.location.origin
-Object.defineProperty(window, "location", {
-  value: {
-    origin: "http://localhost:3000",
-  },
-  writable: true,
-});
 
 describe("SignUp", () => {
   it("should render the sign up form correctly", async () => {
