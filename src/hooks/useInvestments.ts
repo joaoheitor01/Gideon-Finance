@@ -9,11 +9,12 @@ export interface Investment {
   user_id: string;
   name: string;
   type: string;
-  amount: number;
   quantity: number;
   purchase_price: number;
-  current_price: number;
+  current_price: number | null;
   purchase_date: string;
+  broker?: string | null;
+  notes?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -25,19 +26,22 @@ export interface InvestmentInput {
   purchase_price: number;
   current_price: number;
   purchase_date: string;
+  broker?: string | null;
+  notes?: string | null;
 }
 
-export const INVESTMENT_TYPES = [
-  "Ações",
-  "FIIs",
-  "Crypto",
-  "Tesouro Direto",
-  "CDB",
-  "LCI/LCA",
-  "Poupança",
-  "ETFs",
-  "Outros",
-];
+// Mapeamento de tipo de investimento: valor no banco -> label para usuário
+export const INVESTMENT_TYPE_MAP: Record<string, string> = {
+  'acao': 'Ações',
+  'fii': 'Fundos Imobiliários (FII)',
+  'cripto': 'Criptomoedas',
+  'renda_fixa': 'Renda Fixa',
+  'etf': 'ETFs',
+  'outros': 'Outros',
+};
+
+// Valores válidos para o banco de dados (enum do constraint)
+export const INVESTMENT_TYPE_VALUES = Object.keys(INVESTMENT_TYPE_MAP);
 
 export function useInvestments() {
   const { user } = useAuth();
@@ -88,7 +92,8 @@ export function useInvestments() {
         purchase_price: input.purchase_price,
         current_price: input.current_price,
         purchase_date: input.purchase_date,
-        amount: input.purchase_price * input.quantity,
+        ...(input.broker && { broker: input.broker }),
+        ...(input.notes && { notes: input.notes }),
       })
       .select()
       .single();
@@ -113,10 +118,17 @@ export function useInvestments() {
   const updateInvestment = async (id: string, input: Partial<InvestmentInput>) => {
     if (!user) return { error: new Error("Usuário não autenticado") };
 
-    const updates: Record<string, unknown> = { ...input };
-    if (input.quantity && input.purchase_price) {
-      updates.amount = input.quantity * input.purchase_price;
-    }
+    const updates: Record<string, unknown> = {};
+    
+    // Apenas adiciona os campos que foram fornecidos
+    if (input.name !== undefined) updates.name = input.name;
+    if (input.type !== undefined) updates.type = input.type;
+    if (input.quantity !== undefined) updates.quantity = input.quantity;
+    if (input.purchase_price !== undefined) updates.purchase_price = input.purchase_price;
+    if (input.current_price !== undefined) updates.current_price = input.current_price;
+    if (input.purchase_date !== undefined) updates.purchase_date = input.purchase_date;
+    if (input.broker !== undefined) updates.broker = input.broker;
+    if (input.notes !== undefined) updates.notes = input.notes;
 
     const { data, error } = await supabase
       .from("investments")
@@ -148,12 +160,9 @@ export function useInvestments() {
   const updateCurrentPrice = async (id: string, current_price: number) => {
     if (!user) return { error: new Error("Usuário não autenticado") };
 
-    const investment = investments.find((i) => i.id === id);
-    if (!investment) return { error: new Error("Investimento não encontrado") };
-
     const { data, error } = await supabase
       .from("investments")
-      .update({ current_price, amount: current_price * investment.quantity })
+      .update({ current_price })
       .eq("id", id)
       .eq("user_id", user.id)
       .select()
@@ -229,14 +238,14 @@ export function useInvestments() {
       if (newPrice != null && newPrice !== inv.current_price) {
         const { error } = await supabase
           .from("investments")
-          .update({ current_price: newPrice, amount: newPrice * inv.quantity })
+          .update({ current_price: newPrice })
           .eq("id", inv.id)
           .eq("user_id", user.id);
 
         if (!error) {
           updatedCount++;
           setInvestments((prev) =>
-            prev.map((t) => (t.id === inv.id ? { ...t, current_price: newPrice, amount: newPrice * t.quantity } : t))
+            prev.map((t) => (t.id === inv.id ? { ...t, current_price: newPrice } : t))
           );
         }
       }

@@ -1,12 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { useInvestments, INVESTMENT_TYPES } from "@/hooks/useInvestments";
-import { useStockQuote } from "@/hooks/useStockQuote";
+import { useInvestments, INVESTMENT_TYPE_MAP, INVESTMENT_TYPE_VALUES } from "@/hooks/useInvestments";
+import useTickerSearch, { TickerResult } from "@/hooks/useTickerSearch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { CheckCircle2, AlertCircle, Loader2, Search } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -37,6 +37,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/lib/formatters";
+import { fetchHistoricalPrice } from "@/lib/marketApi";
 import {
   TrendingUp,
   TrendingDown,
@@ -76,7 +77,7 @@ const COLORS = [
 
 const DEFAULT_FORM = {
   name: "",
-  type: "Ações" as string,
+  type: "acao", // Valor do banco, não label
   quantity: "",
   purchase_price: "",
   current_price: "",
@@ -91,43 +92,140 @@ export default function Investments() {
   const [priceDirty, setPriceDirty] = useState(false);
   const [updatingPrices, setUpdatingPrices] = useState(false);
   const [form, setForm] = useState({ ...DEFAULT_FORM });
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+  const [showRealTimeMsg, setShowRealTimeMsg] = useState(false);
 
-  const quantityAsTrigger = form.quantity && !isNaN(parseFloat(form.quantity.replace(",", ".")))
-    ? parseFloat(form.quantity.replace(",", "."))
-    : null;
+  const {
+    getQuote,
+    loading: tickerLoading,
+    results,
+    searchQuery,
+    setSearchQuery,
+  } = useTickerSearch();
 
-  const quote = useStockQuote(
-    priceDirty ? "" : form.name,
-    priceDirty ? null : quantityAsTrigger,
-  );
-
-  // Reset form when dialog closes
+  // Efeito: reseta formulário quando dialog fecha
   useEffect(() => {
     if (!dialogOpen) {
       setForm({ ...DEFAULT_FORM });
       setPriceDirty(false);
+      setShowDropdown(false);
+      setQuoteError(null);
+      setShowRealTimeMsg(false);
+      setSearchQuery("");
     }
-  }, [dialogOpen]);
+  }, [dialogOpen, setSearchQuery]);
 
-  // Sync fetched price to form
-  useEffect(() => {
-    if (quote.status === "success" && quote.price != null && !priceDirty) {
-      const priceStr = quote.price.toFixed(2);
-      setForm((prev) => ({
-        ...prev,
-        purchase_price: priceStr,
-        current_price: priceStr,
-      }));
+  // Handle ticker selection from dropdown
+  const handleTickerSelect = async (selected: TickerResult) => {
+    // Preenche ticker e tipo automaticamente
+    setForm(prev => ({
+      ...prev,
+      name: selected.ticker,
+      type: selected.type,
+    }));
+    setShowDropdown(false);
+    setQuoteError(null);
+    setShowRealTimeMsg(false);
+
+    // Se quantidade já foi preenchida, busca o preço
+    if (form.quantity && parseFloat(form.quantity.replace(",", ".")) > 0) {
+      fetchAndSetPrice(selected.ticker);
     }
-  }, [quote.price, quote.status, priceDirty]);
+  };
+
+  // Busca e preenche o preço atual da cotação
+  const fetchAndSetPrice = async (ticker: string) => {
+    setQuoteLoading(true);
+    setQuoteError(null);
+
+    try {
+      const price = await getQuote(ticker);
+      if (price !== null) {
+        setForm(prev => ({
+          ...prev,
+          current_price: price.toFixed(2),
+          purchase_price: price.toFixed(2),
+        }));
+        setShowRealTimeMsg(true);
+        // Esconde mensagem após 3 segundos
+        setTimeout(() => setShowRealTimeMsg(false), 3000);
+      } else {
+        setQuoteError('Cotação indisponível, preencha manualmente');
+      }
+    } catch (err) {
+      console.error('Erro ao buscar cotação:', err);
+      setQuoteError('Cotação indisponível, preencha manualmente');
+    } finally {
+      setQuoteLoading(false);
+    }
+  };
+
+  // Busca preço histórico para uma data de compra específica
+  const fetchHistoricalPriceForForm = useCallback(async (ticker: string, purchaseDate: string) => {
+    if (!ticker || !purchaseDate) return;
+    
+    setQuoteLoading(true);
+    try {
+      const historicalPrice = await fetchHistoricalPrice(ticker, purchaseDate);
+      if (historicalPrice !== null) {
+        setForm(prev => ({
+          ...prev,
+          purchase_price: historicalPrice.toFixed(2),
+        }));
+        setShowRealTimeMsg(true);
+        setTimeout(() => setShowRealTimeMsg(false), 4000);
+      } else {
+        // Se não encontrar preço histórico, buscar preço atual como fallback
+        const currentPrice = await getQuote(ticker);
+        if (currentPrice !== null) {
+          setForm(prev => ({
+            ...prev,
+            purchase_price: currentPrice.toFixed(2),
+          }));
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao buscar preço histórico:', err);
+    } finally {
+      setQuoteLoading(false);
+    }
+  }, [getQuote]);
+
+  // Efeito: buscar preço histórico quando data de compra ou ticker mudam
+  useEffect(() => {
+    if (form.name && form.purchase_date && !priceDirty) {
+      fetchHistoricalPriceForForm(form.name, form.purchase_date);
+    }
+  }, [form.name, form.purchase_date, priceDirty, fetchHistoricalPriceForForm]);
+
+  // Quando usuário digita no ticker, atualiza searchQuery (com debounce automático do hook)
+  const handleTickerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.toUpperCase();
+    setForm(prev => ({ ...prev, name: value }));
+    setSearchQuery(value);
+    setShowDropdown(true);
+    setQuoteError(null);
+    setShowRealTimeMsg(false);
+  };
+
+  // Quando quantidade é preenchida, busca preço se ticker está selecionado
+  const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setForm(prev => ({ ...prev, quantity: value }));
+
+    // Se tem ticker válido e quantidade válida, busca preço
+    if (form.name && value && !isNaN(parseFloat(value.replace(",", ".")))) {
+      fetchAndSetPrice(form.name);
+    }
+  };
 
   const canSubmit = (() => {
     if (!form.name.trim() || !form.quantity || !form.purchase_price) return false;
     const qty = parseFloat(form.quantity.replace(",", "."));
     const prc = parseFloat(form.purchase_price.replace(",", "."));
     if (isNaN(qty) || isNaN(prc) || prc <= 0 || qty <= 0) return false;
-    if (quote.status === "error") return false;
-    if (quote.status === "fetching" && !form.purchase_price) return false;
     return true;
   })();
 
@@ -166,18 +264,23 @@ export default function Investments() {
 
   // Totals
   const totalInvested = investments.reduce((sum, i) => sum + i.purchase_price * i.quantity, 0);
-  const totalCurrent = investments.reduce((sum, i) => sum + i.current_price * i.quantity, 0);
+  const totalCurrent = investments.reduce((sum, i) => sum + (i.current_price ?? i.purchase_price) * i.quantity, 0);
   const totalProfit = totalCurrent - totalInvested;
   const totalProfitPercent = totalInvested > 0 ? (totalProfit / totalInvested) * 100 : 0;
+
+  // Helper: converter tipo do banco para label legível
+  const getTypeLabel = (typeValue: string): string => {
+    return INVESTMENT_TYPE_MAP[typeValue] || typeValue;
+  };
 
   // Chart data
   const categoryData = (() => {
     const map: Record<string, number> = {};
     investments.forEach((i) => {
-      map[i.type] = (map[i.type] || 0) + i.current_price * i.quantity;
+      map[i.type] = (map[i.type] || 0) + (i.current_price ?? i.purchase_price) * i.quantity;
     });
     return Object.entries(map)
-      .map(([name, value]) => ({ name, value }))
+      .map(([typeValue, value]) => ({ name: getTypeLabel(typeValue), value }))
       .sort((a, b) => b.value - a.value);
   })();
 
@@ -185,13 +288,13 @@ export default function Investments() {
     .map((i) => ({
       name: i.name.length > 12 ? i.name.slice(0, 12) + "..." : i.name,
       investido: i.purchase_price * i.quantity,
-      atual: i.current_price * i.quantity,
+      atual: (i.current_price ?? i.purchase_price) * i.quantity,
     }))
     .slice(0, 8);
 
   const getProfitability = (investment: (typeof investments)[0]) => {
     const invested = investment.purchase_price * investment.quantity;
-    const current = investment.current_price * investment.quantity;
+    const current = (investment.current_price ?? investment.purchase_price) * investment.quantity;
     const diff = current - invested;
     const pct = invested > 0 ? diff / invested : 0;
     return { diff, pct };
@@ -240,91 +343,135 @@ export default function Investments() {
                 Novo Investimento
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
                 <DialogTitle>Adicionar Investimento</DialogTitle>
                 <DialogDescription>
                   Preencha os dados do novo investimento.
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4">
+              <div className="space-y-4 py-4">
+                {/* Ticker com Auto-complete */}
                 <div>
-                  <Label>Ativo (Ticker)</Label>
+                  <Label htmlFor="ticker">Ativo (Ticker) *</Label>
                   <div className="relative">
-                    <Input
-                      placeholder="Ex: PETR4, MXRF11, BTC"
-                      value={form.name}
-                      onChange={(e) => {
-                        setForm((p) => ({ ...p, name: e.target.value }));
-                        if (priceDirty) setPriceDirty(false);
-                      }}
-                      className={quote.status === "error" ? "border-destructive pr-9" : ""}
-                      autoCapitalize="characters"
-                    />
-                    {quote.status === "fetching" && (
-                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-                    )}
-                    {quote.status === "success" && quote.price != null && (
-                      <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
-                    )}
-                    {quote.status === "error" && (
-                      <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-destructive" />
+                    <div className="relative">
+                      <Input
+                        id="ticker"
+                        placeholder="Ex: PETR4, MXRF11, BTC"
+                        value={form.name}
+                        onChange={handleTickerChange}
+                        onFocus={() => form.name.length >= 2 && setShowDropdown(true)}
+                        className="pr-9"
+                        autoCapitalize="characters"
+                        autoComplete="off"
+                      />
+                      {/* Spinner de carregamento */}
+                      {tickerLoading && (
+                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                      )}
+                      {/* Ícone de sucesso quando tem resultados */}
+                      {!tickerLoading && form.name.length >= 2 && results.length > 0 && (
+                        <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
+                      )}
+                    </div>
+
+                    {/* Dropdown de resultados */}
+                    {showDropdown && form.name.length >= 2 && (
+                      <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg overflow-hidden">
+                        {tickerLoading ? (
+                          <div className="flex items-center justify-center py-6 gap-2 text-sm text-muted-foreground">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Buscando ativos...
+                          </div>
+                        ) : results.length > 0 ? (
+                          <div className="max-h-[280px] overflow-y-auto py-1">
+                            {results.map((result) => (
+                              <div
+                                key={result.ticker}
+                                onClick={() => handleTickerSelect(result)}
+                                className="px-3 py-2 cursor-pointer hover:bg-secondary transition-colors"
+                              >
+                                <div className="font-medium text-foreground">
+                                  {result.ticker} — {result.name}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  Preço: {result.price.toFixed(2)} | Tipo: {getTypeLabel(result.type)}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                            Nenhum ativo encontrado
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
-                  {quote.status === "error" && quote.errorMessage && (
-                    <p className="mt-1.5 text-xs text-destructive flex items-center gap-1">
+                  {quoteError && (
+                    <p className="mt-1.5 text-xs text-amber-600 flex items-center gap-1">
                       <AlertCircle className="h-3 w-3" />
-                      {quote.errorMessage}
-                    </p>
-                  )}
-                  {quote.status === "success" && (
-                    <p className="mt-1.5 text-xs text-primary flex items-center gap-1">
-                      <CheckCircle2 className="h-3 w-3" />
-                      {quote.shortName || quote.normalizedTicker} — R$ {quote.price?.toFixed(2)}
-                      {quote.changePercent != null && (
-                        <span className={quote.changePercent >= 0 ? "text-primary" : "text-destructive"}>
-                          ({quote.changePercent >= 0 ? "+" : ""}{quote.changePercent.toFixed(2)}%)
-                        </span>
-                      )}
+                      {quoteError}
                     </p>
                   )}
                 </div>
+
+                {/* Tipo - preenchido automaticamente */}
                 <div>
-                  <Label>Tipo</Label>
-                  <Select value={form.type} onValueChange={(v) => setForm((p) => ({ ...p, type: v }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  <Label htmlFor="type">Tipo *</Label>
+                  <Select
+                    value={form.type}
+                    onValueChange={(v) => setForm((p) => ({ ...p, type: v }))}
+                  >
+                    <SelectTrigger id="type">
+                      <SelectValue placeholder="Selecione o tipo" />
+                    </SelectTrigger>
                     <SelectContent>
-                      {INVESTMENT_TYPES.map((t) => (
-                        <SelectItem key={t} value={t}>{t}</SelectItem>
+                      {INVESTMENT_TYPE_VALUES.map((typeValue) => (
+                        <SelectItem key={typeValue} value={typeValue}>
+                          {INVESTMENT_TYPE_MAP[typeValue]}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Quantidade e Data de Compra */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label>Quantidade</Label>
+                    <Label htmlFor="quantity">Quantidade *</Label>
                     <Input
+                      id="quantity"
                       type="text"
-                      placeholder="0"
+                      inputMode="decimal"
+                      placeholder="0,00"
                       value={form.quantity}
-                      onChange={(e) => setForm((p) => ({ ...p, quantity: e.target.value }))}
+                      onChange={handleQuantityChange}
                     />
                   </div>
                   <div>
-                    <Label>Data Compra</Label>
+                    <Label htmlFor="purchase_date">Data Compra</Label>
                     <Input
+                      id="purchase_date"
                       type="date"
                       value={form.purchase_date}
-                      onChange={(e) => setForm((p) => ({ ...p, purchase_date: e.target.value }))}
+                      onChange={(e) => {
+                        setForm((p) => ({ ...p, purchase_date: e.target.value }));
+                        setPriceDirty(false); // Reset para buscar preço histórico
+                      }}
                     />
                   </div>
                 </div>
 
+                {/* Preço de Compra e Preço Atual */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label>Preço Compra</Label>
+                    <Label htmlFor="purchase_price">Preço Compra *</Label>
                     <Input
+                      id="purchase_price"
                       type="text"
+                      inputMode="decimal"
                       placeholder="0,00"
                       value={form.purchase_price}
                       onChange={(e) => {
@@ -334,25 +481,43 @@ export default function Investments() {
                     />
                   </div>
                   <div>
-                    <Label>Preço Atual</Label>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="current_price">Preço Atual</Label>
+                      {showRealTimeMsg && (
+                        <span className="text-xs text-emerald-600 flex items-center gap-1">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Atualizado
+                        </span>
+                      )}
+                    </div>
                     <Input
+                      id="current_price"
                       type="text"
+                      inputMode="decimal"
                       placeholder="0,00"
                       value={form.current_price}
                       onChange={(e) => {
                         setForm((p) => ({ ...p, current_price: e.target.value }));
                         setPriceDirty(true);
                       }}
+                      disabled={quoteLoading && !form.current_price}
                     />
+                    {quoteLoading && (
+                      <p className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Buscando cotação em tempo real...
+                      </p>
+                    )}
                   </div>
                 </div>
 
+                {/* Total Investido */}
                 {form.quantity && form.purchase_price ? (() => {
                   const qtd = parseFloat(form.quantity.replace(",", "."));
                   const price = parseFloat(form.purchase_price.replace(",", "."));
                   if (isNaN(qtd) || isNaN(price) || price <= 0) return null;
                   return (
-                    <p className="text-sm font-medium text-foreground">
+                    <p className="text-sm font-medium text-foreground bg-secondary/50 p-2 rounded">
                       Total investido: {formatCurrency(qtd * price)}
                     </p>
                   );
@@ -551,7 +716,7 @@ export default function Investments() {
                         <tr key={inv.id} className="border-b last:border-0">
                           <td className="p-3 font-medium text-foreground">{inv.name}</td>
                           <td className="p-3">
-                            <Badge variant="secondary">{inv.type}</Badge>
+                            <Badge variant="secondary">{getTypeLabel(inv.type)}</Badge>
                           </td>
                           <td className="p-3 text-right">{inv.quantity}</td>
                           <td className="p-3 text-right">{formatCurrency(inv.purchase_price)}</td>

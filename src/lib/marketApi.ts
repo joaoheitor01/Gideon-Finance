@@ -161,3 +161,73 @@ function isValidTicker(ticker: string): boolean {
   // Fallback: allow anything 3-14 alphanumeric chars
   return /^[A-Z0-9]{3,14}$/.test(ticker);
 }
+
+/**
+ * Busca o preço histórico de um ativo para uma data específica
+ * @param ticker - Símbolo do ativo (ex: PETR4, BTCBRL=X)
+ * @param purchaseDate - Data da compra em formato YYYY-MM-DD
+ * @returns Preço na data ou mais próximo, ou null se não encontrar
+ */
+export async function fetchHistoricalPrice(
+  ticker: string,
+  purchaseDate: string
+): Promise<number | null> {
+  if (!BRAPI_TOKEN || !ticker || !purchaseDate) return null;
+
+  try {
+    const normalized = normalizeSymbol(ticker);
+    if (!isValidTicker(normalized)) return null;
+
+    // Formatar data para ISO (YYYY-MM-DD)
+    const requestDate = new Date(purchaseDate);
+    if (isNaN(requestDate.getTime())) return null;
+
+    // Converter para timestamp Unix em milissegundos
+    const fromTimestamp = Math.floor(requestDate.getTime() / 1000);
+    
+    // Buscar histórico de 1 ano (ou até 5 anos se necessário)
+    const toTimestamp = Math.floor(Date.now() / 1000);
+    const url = `https://brapi.dev/api/quote/${normalized}/history?range=5y&from=${fromTimestamp}&to=${toTimestamp}&token=${BRAPI_TOKEN}`;
+
+    const response = await Promise.race([
+      fetch(url),
+      new Promise<Response>((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout")), REQUEST_TIMEOUT)
+      ),
+    ]);
+
+    if (!response.ok) return null;
+
+    const data = (await parseSafeJson(response)) as any;
+    
+    if (!data.results || !Array.isArray(data.results)) return null;
+
+    // Procurar pelo preço mais próximo da data solicitada
+    const targetDate = new Date(purchaseDate).getTime();
+    let closestPrice: number | null = null;
+    let closestDiff = Infinity;
+
+    for (const candle of data.results) {
+      if (!candle.close || typeof candle.close !== "number") continue;
+
+      const candleDate = new Date(candle.date).getTime();
+      const diff = Math.abs(candleDate - targetDate);
+
+      // Se encontrar o mesmo dia, retornar imediatamente
+      if (diff === 0) {
+        return candle.close;
+      }
+
+      // Guardar o mais próximo
+      if (diff < closestDiff && candleDate <= targetDate) {
+        closestDiff = diff;
+        closestPrice = candle.close;
+      }
+    }
+
+    return closestPrice;
+  } catch (error) {
+    console.error(`Erro ao buscar preço histórico de ${ticker}:`, error);
+    return null;
+  }
+}
